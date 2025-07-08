@@ -1,20 +1,19 @@
-
 // backend/models/Post.js
 const mongoose = require('mongoose');
 
 const PostSchema = new mongoose.Schema({
   user: {
-    type: mongoose.Schema.Types.ObjectId, // This field will store the unique ID of the user who created the post
-    ref: 'User',                         // It references the 'User' model, establishing a relationship
-    required: true                       // Every post must be associated with a user
+    type: mongoose.Schema.Types.ObjectId, // ID of the user who created the post
+    ref: 'User',                         // References the 'User' model
+    required: true
   },
-  username: { // Store username directly for easier display on the frontend without extra lookups
+  username: {
     type: String,
     required: true
   },
-  userAvatar: { // Store user avatar directly for display
+  userAvatar: { // Store user avatar directly (e.g., placeholder or actual URL)
     type: String,
-    default: 'https://placehold.co/100x100/87CEEB/000000?text=USER' // Default placeholder avatar
+    default: 'https://placehold.co/100x100/87CEEB/000000?text=USER'
   },
   imageUrl: {
     type: String,
@@ -26,30 +25,39 @@ const PostSchema = new mongoose.Schema({
   },
   likes: {
     type: Number,
-    default: 0 // Initialize likes to 0 for new posts
+    default: 0
   },
-  comments: [ // An array of comments, where each comment is an object
+  likedBy: [ // NEW: Array to store IDs of users who liked this post
     {
-      user: { // The username of the commenter
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  ],
+  comments: [
+    {
+      user: { // NEW: Store the actual user ID of the commenter for verification
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      username: { // Store username directly for display
         type: String,
         required: true
       },
-      text: { // The text content of the comment
+      text: {
         type: String,
         required: true
       },
-      date: { // Timestamp for when the comment was made
+      date: {
         type: Date,
         default: Date.now
       }
     }
   ],
-  date: { // Timestamp for when the post was created
+  date: {
     type: Date,
     default: Date.now
   }
 });
 
 module.exports = mongoose.model('Post', PostSchema);
-
-
