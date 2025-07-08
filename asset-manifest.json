@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "https://lakshmi615.github.io/foodiegram-fullstack-app/static/css/main.e6c13ad2.css",
+    "main.js": "https://lakshmi615.github.io/foodiegram-fullstack-app/static/js/main.f78767e9.js",
+    "static/js/453.d5484067.chunk.js": "https://lakshmi615.github.io/foodiegram-fullstack-app/static/js/453.d5484067.chunk.js",
+    "index.html": "https://lakshmi615.github.io/foodiegram-fullstack-app/index.html",
+    "main.e6c13ad2.css.map": "https://lakshmi615.github.io/foodiegram-fullstack-app/static/css/main.e6c13ad2.css.map",
+    "main.f78767e9.js.map": "https://lakshmi615.github.io/foodiegram-fullstack-app/static/js/main.f78767e9.js.map",
+    "453.d5484067.chunk.js.map": "https://lakshmi615.github.io/foodiegram-fullstack-app/static/js/453.d5484067.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e6c13ad2.css",
+    "static/js/main.f78767e9.js"
+  ]
+}
