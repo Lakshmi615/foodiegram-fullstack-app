@@ -1,59 +1,55 @@
 
-// --- models/Post.js ---
-// This file defines the Mongoose schema for a 'Post' in your database.
-
+// backend/models/Post.js
 const mongoose = require('mongoose');
 
-const commentSchema = new mongoose.Schema({
+const PostSchema = new mongoose.Schema({
   user: {
+    type: mongoose.Schema.Types.ObjectId, // This field will store the unique ID of the user who created the post
+    ref: 'User',                         // It references the 'User' model, establishing a relationship
+    required: true                       // Every post must be associated with a user
+  },
+  username: { // Store username directly for easier display on the frontend without extra lookups
     type: String,
-    required: true,
+    required: true
   },
-  text: {
+  userAvatar: { // Store user avatar directly for display
     type: String,
-    required: true,
-    trim: true, // Remove whitespace from both ends of a string
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
-
-const postSchema = new mongoose.Schema({
-  user: {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    avatar: {
-      type: String, // URL to the user's avatar image
-      default: 'https://placehold.co/100x100/CCCCCC/000000?text=User', // Default avatar
-    },
+    default: 'https://placehold.co/100x100/87CEEB/000000?text=USER' // Default placeholder avatar
   },
   imageUrl: {
-    type: String, // URL to the post's image
-    required: true,
+    type: String,
+    required: true
   },
   caption: {
     type: String,
-    trim: true,
-    maxlength: 500, // Optional: limit caption length
+    required: true
   },
   likes: {
     type: Number,
-    default: 0,
+    default: 0 // Initialize likes to 0 for new posts
   },
-  comments: [commentSchema], // Array of comment sub-documents
-  createdAt: {
+  comments: [ // An array of comments, where each comment is an object
+    {
+      user: { // The username of the commenter
+        type: String,
+        required: true
+      },
+      text: { // The text content of the comment
+        type: String,
+        required: true
+      },
+      date: { // Timestamp for when the comment was made
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
+  date: { // Timestamp for when the post was created
     type: Date,
-    default: Date.now, // Automatically set creation date
-  },
-}, {
-  timestamps: true // Adds `createdAt` and `updatedAt` fields automatically
+    default: Date.now
+  }
 });
 
-// Create and export the Post model
-module.exports = mongoose.model('Post', postSchema);
+module.exports = mongoose.model('Post', PostSchema);
+
 

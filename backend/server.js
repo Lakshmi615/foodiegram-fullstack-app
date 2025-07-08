@@ -1,70 +1,144 @@
-// --- server.js ---
-// This is the main entry point for your Express.js backend application.
+// backend/server.js
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+require('dotenv').config(); // Load environment variables from .env file (e.g., MONGODB_URI, PORT, JWT_SECRET)
 
-// Import necessary modules
-const express = require('express'); // Express.js framework
-const mongoose = require('mongoose'); // Mongoose for MongoDB object modeling
-const dotenv = require('dotenv'); // For loading environment variables from .env file
-const cors = require('cors'); // For enabling Cross-Origin Resource Sharing
-const postRoutes = require('./routes/posts'); // Import post routes
+// Import Post model (now updated to include user field)
+const Post = require('./models/Post');
 
-// Load environment variables from .env file
-// This allows you to keep sensitive information (like database URIs) out of your code
-// In a real deployment, these would be configured in your hosting environment.
-dotenv.config();
+// Import authentication router and verifyToken middleware from auth.js
+const { router: authRouter, verifyToken } = require('./routes/auth');
 
-// Initialize the Express application
 const app = express();
+const port = process.env.PORT || 5000; // Use port from .env or default to 5000
 
-// --- Middleware ---
-// Middleware functions are executed in sequence for every incoming request.
+// --- Middleware Setup ---
+app.use(cors()); // Enable Cross-Origin Resource Sharing for all routes
+app.use(express.json()); // Enable parsing of JSON request bodies (for req.body)
 
-// Enable CORS for all origins.
-// In a production environment, you would restrict this to your frontend's domain.
-app.use(cors());
+// --- MongoDB Connection ---
+const uri = process.env.MONGODB_URI; // Get MongoDB URI from environment variables
+mongoose.connect(uri)
+  .then(() => console.log('Connected to MongoDB Atlas!')) // Success message
+  .catch(err => console.error('MongoDB connection error:', err)); // Error message
 
-// Parse JSON request bodies. This is essential for handling data sent from the frontend.
-app.use(express.json());
+// --- API Routes ---
 
-// --- Database Connection ---
-const MONGODB_URI = process.env.MONGODB_URI; // Get MongoDB URI from environment variables
+// Authentication Routes (Public access)
+// All routes defined in auth.js will be prefixed with /api/auth
+app.use('/api/auth', authRouter);
 
-if (!MONGODB_URI) {
-  console.error('Error: MONGODB_URI is not defined in environment variables.');
-  console.error('Please create a .env file with MONGODB_URI=your_mongodb_connection_string');
-  // Exit the process if the URI is missing, as the app cannot function without it.
-  process.exit(1);
-}
+// Post Routes (Some are protected, some are public)
 
-mongoose.connect(MONGODB_URI)
-  .then(() => {
-    console.log('Connected to MongoDB Atlas!');
-  })
-  .catch((error) => {
-    console.error('MongoDB connection error:', error);
-    // Exit if database connection fails
-    process.exit(1);
-  });
-
-// --- Routes ---
-// Mount the post routes under the '/api/posts' path.
-// All requests to /api/posts will be handled by the postRoutes.
-app.use('/api/posts', postRoutes);
-
-// Basic route for the root URL
-app.get('/', (req, res) => {
-  res.send('FoodieGram Backend API is running!');
+// @route   GET /api/posts
+// @desc    Get all posts
+// @access  Public (Anyone can view posts without logging in)
+app.get('/api/posts', async (req, res) => {
+  try {
+    // Find all posts and sort by date in descending order (newest first)
+    // .populate('user', 'username userAvatar') could be used here if you want to fetch
+    // the full user object from the User collection, but we're storing username/avatar directly in Post for simplicity.
+    const posts = await Post.find().sort({ date: -1 });
+    res.json(posts);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
 });
 
-// --- Error Handling Middleware (Optional but Recommended) ---
-// This middleware catches any errors that occur during request processing.
-app.use((err, req, res, next) => {
-  console.error(err.stack); // Log the error stack for debugging
-  res.status(500).send('Something broke!'); // Send a generic error response
+// @route   POST /api/posts
+// @desc    Create a new post
+// @access  Private (Requires a valid JWT in the Authorization header)
+app.post('/api/posts', verifyToken, async (req, res) => {
+  // req.user.id is available here because the verifyToken middleware attached it
+  const { imageUrl, caption } = req.body;
+
+  try {
+    // Fetch the user from the database using the ID from the token
+    // This is important to get the username and potentially other user details.
+    const user = await mongoose.model('User').findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    // Create a new Post document
+    const newPost = new Post({
+      user: req.user.id, // Store the actual user ID (ObjectId)
+      username: user.username, // Store the username for display
+      userAvatar: user.userAvatar || 'https://placehold.co/100x100/87CEEB/000000?text=' + user.username.substring(0,1).toUpperCase(), // Use user's avatar if available, otherwise a placeholder
+      imageUrl,
+      caption
+    });
+
+    // Save the new post to the database
+    const savedPost = await newPost.save();
+    res.status(201).json(savedPost); // Respond with the newly created post data
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
 });
 
-// --- Start the Server ---
-const PORT = process.env.PORT || 5000; // Use port from environment variable or default to 5000
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// @route   PUT /api/posts/:id/like
+// @desc    Like a post
+// @access  Private (Requires a valid JWT)
+app.put('/api/posts/:id/like', verifyToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({ msg: 'Post not found' });
+    }
+
+    // For simplicity, we're just incrementing likes.
+    // In a real app, you'd track which user liked the post to prevent multiple likes
+    // and allow unliking.
+    post.likes = (post.likes || 0) + 1; // Ensure likes is a number, default to 0 if undefined
+
+    await post.save();
+    res.json({ likes: post.likes }); // Respond with the updated like count
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST /api/posts/:id/comment
+// @desc    Add a comment to a post
+// @access  Private (Requires a valid JWT)
+app.post('/api/posts/:id/comment', verifyToken, async (req, res) => {
+  const { text } = req.body; // Frontend will send only the comment text
+
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({ msg: 'Post not found' });
+    }
+
+    // Fetch the authenticated user's username to associate with the comment
+    const user = await mongoose.model('User').findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    const newComment = {
+      user: user.username, // Store the username of the commenter
+      text: text
+    };
+
+    post.comments.unshift(newComment); // Add new comment to the beginning of the array (most recent first)
+
+    await post.save();
+    res.json({ comments: post.comments }); // Respond with the updated comments array
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// --- Server Start ---
+app.listen(port, () => {
+  console.log(`Server is running on port: ${port}`);
 });
